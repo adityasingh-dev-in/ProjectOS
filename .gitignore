@@ -34,3 +34,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Turbo build cache
+.turbo/
+**/.turbo/
+
+# Compiled output
+**/dist/
+**/out/
+**/.next/
+
+# Logs
+*.log
