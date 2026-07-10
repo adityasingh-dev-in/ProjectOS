@@ -2,10 +2,14 @@
   "name": "projectos-monorepo",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@11.10.0",
   "scripts": {
-    "dev": "pnpm --filter web dev",
-    "build": "pnpm -r build",
-    "lint": "pnpm -r lint"
+    "dev": "turbo dev",
+    "build": "pnpm format:check && pnpm lint && turbo build",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
@@ -14,6 +18,7 @@
     "cross-env": "^10.1.0",
     "cz-git": "^1.13.1",
     "dotenv-cli": "^11.0.0",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",

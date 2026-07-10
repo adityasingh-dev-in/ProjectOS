@@ -1,0 +1,27 @@
+{
+  "files": {
+    "apps/server/.turbo/turbo-build.log": {
+      "size": 6,
+      "mtime_nanos": 1783669117384516700,
+      "mode": 420,
+      "is_dir": false
+    },
+    "apps/server/dist/index.js": {
+      "size": 1264,
+      "mtime_nanos": 1783669117300459800,
+      "mode": 420,
+      "is_dir": false
+    },
+    "apps/server/dist": {
+      "size": 0,
+      "mtime_nanos": 0,
+      "mode": 0,
+      "is_dir": true
+    }
+  },
+  "order": [
+    "apps/server/.turbo/turbo-build.log",
+    "apps/server/dist",
+    "apps/server/dist/index.js"
+  ]
+}
