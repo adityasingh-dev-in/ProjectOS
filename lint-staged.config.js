@@ -1,9 +1,9 @@
-const path = require("path");
+import path from "path";
 
 const escape = (files) =>
   files.map((f) => `"${f.replace(/\\/g, "/")}"`).join(" ");
 
-module.exports = {
+export default {
   "apps/web/**/*.{js,jsx,ts,tsx,mjs,cjs}": (filenames) => {
     const relativeFiles = filenames.map((file) =>
       path.relative(path.resolve("apps/web"), file),

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@11.10.0",
+  "type": "module",
   "scripts": {
     "dev": "turbo dev",
     "build": "pnpm format:check && pnpm lint && turbo build",
