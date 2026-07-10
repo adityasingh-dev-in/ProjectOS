@@ -11,6 +11,14 @@
         "!dist/**/*.log"
       ]
     },
+    "@projectos/shared#build": {
+      "dependsOn": [],
+      "outputs": []
+    },
+    "@projectos/ui#build": {
+      "dependsOn": [],
+      "outputs": []
+    },
     "lint": {
       "dependsOn": ["^lint"]
     },

@@ -1,8 +1,10 @@
 import js from "@eslint/js";
 import globals from "globals";
+import tseslint from "typescript-eslint";
 
-export default [
+export default tseslint.config(
   js.configs.recommended,
+  ...tseslint.configs.recommended,
   {
     languageOptions: {
       ecmaVersion: 2022,
@@ -15,6 +17,6 @@ export default [
     rules: {
       // add any custom rules
     },
-    ignores: ["dist", "node_modules"],
+    ignores: ["dist", "node_modules", ".turbo"],
   },
-];
+);

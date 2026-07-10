@@ -4,7 +4,7 @@ const escape = (files) =>
   files.map((f) => `"${f.replace(/\\/g, "/")}"`).join(" ");
 
 export default {
-  "apps/web/src/**/*.{js,jsx,ts,tsx,mjs,cjs}": (filenames) => {
+  "apps/web/app/**/*.{js,jsx,ts,tsx,mjs,cjs}": (filenames) => {
     const relativeFiles = filenames.map((file) =>
       path.relative(path.resolve("apps/web"), file),
     );
