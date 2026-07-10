@@ -4,7 +4,7 @@ const escape = (files) =>
   files.map((f) => `"${f.replace(/\\/g, "/")}"`).join(" ");
 
 export default {
-  "apps/web/**/*.{js,jsx,ts,tsx,mjs,cjs}": (filenames) => {
+  "apps/web/src/**/*.{js,jsx,ts,tsx,mjs,cjs}": (filenames) => {
     const relativeFiles = filenames.map((file) =>
       path.relative(path.resolve("apps/web"), file),
     );
@@ -13,7 +13,7 @@ export default {
       `pnpm --filter web exec eslint --fix ${escape(relativeFiles)}`,
     ];
   },
-  "apps/server/**/*.{js,jsx,ts,tsx,mjs,cjs}": (filenames) => {
+  "apps/server/src/**/*.{js,jsx,ts,tsx,mjs,cjs}": (filenames) => {
     const relativeFiles = filenames.map((file) =>
       path.relative(path.resolve("apps/server"), file),
     );
@@ -23,6 +23,7 @@ export default {
     ];
   },
   "!(apps/web|apps/server)/**/*.{js,jsx,ts,tsx,mjs,cjs}": (filenames) => {
+    // This covers root config files and packages/* – ensure they have ESLint configs if you run eslint on them.
     return `prettier --write ${escape(filenames)}`;
   },
   "**/*.{json,jsonc,md,mdx,css,scss,yml,yaml,html}": (filenames) => {
