@@ -1,4 +1,5 @@
 import express from "express";
+import { capitalize, formatDate } from "@projectos/shared";
 import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
@@ -35,8 +36,9 @@ io.on("connection", (socket) => {
 // Health check route
 app.get("/api/health", (req, res) => {
     res.json({
-        status: "ok",
+        status: capitalize("ok"),
         timestamp: new Date().toISOString(),
+        date: formatDate(new Date()),
         uptime: process.uptime(),
     });
 });

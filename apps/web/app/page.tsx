@@ -1,4 +1,8 @@
+"use client";
+
 import Image from "next/image";
+import { capitalize } from "@projectos/shared";
+import { Button } from "@projectos/ui";
 
 export default function Home() {
   return (
@@ -14,7 +18,7 @@ export default function Home() {
         />
         <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
           <h1 className="max-w-xs text-3xl leading-10 font-semibold tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+            {capitalize("welcome to Next.js!")}
           </h1>
           <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
             Looking for a starting point or more instructions? Head over to{" "}
@@ -33,6 +37,13 @@ export default function Home() {
             </a>{" "}
             center.
           </p>
+          <div className="mt-2">
+            <Button
+              label={capitalize("click here")}
+              className="rounded-full bg-black px-6 py-3 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-black dark:hover:bg-zinc-200"
+              onClick={() => alert("Inter-package communication verified!")}
+            />
+          </div>
         </div>
         <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
           <a
