@@ -47,6 +47,6 @@ next-env.d.ts
 # Logs
 *.log
 
-# temporary
-docs
-assets
+# docs generated coverage reports (ignored as they are highly dynamic and regenerated locally)
+docs/06-generated/coverage/*
+!docs/06-generated/coverage/.gitkeep

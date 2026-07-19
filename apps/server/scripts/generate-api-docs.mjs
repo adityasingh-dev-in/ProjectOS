@@ -45,7 +45,10 @@ const MODULES_DIR = path.join(SERVER_ROOT, "src/modules");
 
 // ─── swagger-autogen requires CommonJS require() ──────────────────────────────
 const require = createRequire(import.meta.url);
-const swaggerAutogen = require("swagger-autogen")({ openapi: "3.0.0" });
+const swaggerAutogen = require("swagger-autogen")({
+  openapi: "3.0.0",
+  writeOutputFile: false,
+});
 
 // ─── Load base document ───────────────────────────────────────────────────────
 const { swaggerDocument } = await import("./swagger.config.mjs");
@@ -64,7 +67,15 @@ async function findRouteFiles() {
 
   for (const entry of entries) {
     if (entry.endsWith(".route.ts")) {
-      files.push(path.join(MODULES_DIR, entry));
+      const fullPath = path.join(MODULES_DIR, entry);
+      try {
+        const stats = fs.statSync(fullPath);
+        if (stats.size === 0) {
+          console.warn(`[docs:api] ⚠️  Skipping empty route file: ${entry}`);
+          continue;
+        }
+      } catch (_) {}
+      files.push(fullPath);
     }
   }
 
@@ -94,34 +105,99 @@ async function main() {
   // Ensure output directory exists
   fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
 
+  // Read existing file if any
+  let existing = null;
+  try {
+    if (fs.existsSync(OUTPUT_FILE)) {
+      existing = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"));
+    }
+  } catch (_) {}
+
   // If no routes found, write a valid skeleton so the file always exists
   if (routeFiles.length === 0) {
     const skeleton = {
       ...swaggerDocument,
       paths: {},
-      "x-generated-at": new Date().toISOString(),
       "x-generated-by": "swagger-autogen",
       "x-note":
         "No route files found. Add *.route.ts files to src/modules/<feature>/ to populate this spec.",
     };
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(skeleton, null, 2));
-    console.log(`[docs:api] ✅ Skeleton written to ${OUTPUT_FILE}`);
+
+    const skeletonNormalized = { ...skeleton };
+    delete skeletonNormalized["x-generated-at"];
+
+    const existingNormalized = existing ? { ...existing } : null;
+    if (existingNormalized) {
+      delete existingNormalized["x-generated-at"];
+    }
+
+    if (
+      existing &&
+      JSON.stringify(skeletonNormalized) === JSON.stringify(existingNormalized)
+    ) {
+      console.log(
+        `[docs:api] 📄 No changes detected. OpenAPI spec is up-to-date.`,
+      );
+    } else {
+      skeleton["x-generated-at"] = new Date().toISOString();
+      fs.writeFileSync(OUTPUT_FILE, JSON.stringify(skeleton, null, 2));
+      console.log(`[docs:api] ✅ Skeleton written to ${OUTPUT_FILE}`);
+    }
     return;
   }
 
   // Run swagger-autogen
   try {
-    await swaggerAutogen(OUTPUT_FILE, routeFiles, swaggerDocument);
-
-    // Inject generation metadata
-    const generated = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"));
-    generated["x-generated-at"] = new Date().toISOString();
-    generated["x-generated-by"] = "swagger-autogen";
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(generated, null, 2));
-
-    console.log(
-      `[docs:api] ✅ OpenAPI spec written to:\n         ${OUTPUT_FILE}`,
+    const result = await swaggerAutogen(
+      OUTPUT_FILE,
+      routeFiles,
+      swaggerDocument,
     );
+
+    // Audit return type/structure and handle failures defensively
+    if (
+      result === false ||
+      (result && typeof result === "object" && result.success === false)
+    ) {
+      console.error("[docs:api] ❌ Swagger generation failed.");
+      process.exit(1);
+    }
+
+    const generated = result.data;
+    if (!generated || typeof generated !== "object" || !generated.info) {
+      console.error(
+        "[docs:api] ❌ Generated specification is invalid or empty.",
+      );
+      process.exit(1);
+    }
+
+    // Prepare generated object with metadata
+    generated["x-generated-by"] = "swagger-autogen";
+
+    // Compare normalized versions (ignoring dynamic x-generated-at timestamp)
+    const generatedNormalized = { ...generated };
+    delete generatedNormalized["x-generated-at"];
+
+    const existingNormalized = existing ? { ...existing } : null;
+    if (existingNormalized) {
+      delete existingNormalized["x-generated-at"];
+    }
+
+    if (
+      existing &&
+      JSON.stringify(generatedNormalized) === JSON.stringify(existingNormalized)
+    ) {
+      console.log(
+        `[docs:api] 📄 No changes detected. OpenAPI spec is up-to-date.`,
+      );
+    } else {
+      // Content changed or file doesn't exist, write new file with fresh timestamp
+      generated["x-generated-at"] = new Date().toISOString();
+      fs.writeFileSync(OUTPUT_FILE, JSON.stringify(generated, null, 2));
+      console.log(
+        `[docs:api] ✅ OpenAPI spec written to:\n         ${OUTPUT_FILE}`,
+      );
+    }
   } catch (err) {
     console.error("[docs:api] ❌ Generation failed:", err.message);
     process.exit(1);

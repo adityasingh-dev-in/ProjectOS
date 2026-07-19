@@ -23,7 +23,7 @@
 
 import { createRequire } from "module";
 import path from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import fs from "fs";
 import { execSync } from "child_process";
 import os from "os";
@@ -57,7 +57,15 @@ function findModelFiles() {
 
   for (const entry of entries) {
     if (entry.endsWith(".model.ts")) {
-      files.push(path.join(MODULES_DIR, entry));
+      const fullPath = path.join(MODULES_DIR, entry);
+      try {
+        const stats = fs.statSync(fullPath);
+        if (stats.size === 0) {
+          console.warn(`[docs:db] ⚠️  Skipping empty model file: ${entry}`);
+          continue;
+        }
+      } catch (_) {}
+      files.push(fullPath);
     }
   }
 
@@ -70,11 +78,11 @@ function findModelFiles() {
 function extractSchemaFromFile(modelFile) {
   // Inline extraction script — runs in the context of the model file's dir
   const extractScript = `
-import model from ${JSON.stringify(modelFile.replace(/\\/g, "/"))};
+import model from ${JSON.stringify(pathToFileURL(modelFile).href)};
 import jsonSchema from "mongoose-schema-jsonschema";
 
 if (!model || !model.schema) {
-  process.stderr.write("SKIP: No .schema property on default export\\n");
+  process.stdout.write("SKIP: No .schema property on default export\\n");
   process.exit(0);
 }
 
@@ -82,13 +90,14 @@ const schema = jsonSchema(model.schema);
 process.stdout.write(JSON.stringify(schema));
 `.trim();
 
-  // Write to a temp file so tsx can execute it
-  const tmpFile = path.join(os.tmpdir(), `_schema_extract_${Date.now()}.mjs`);
+  // Write to a temp file inside the server root so module resolution works correctly across drives
+  const tmpFile = path.join(SERVER_ROOT, `_schema_extract_${Date.now()}.mjs`);
   fs.writeFileSync(tmpFile, extractScript);
 
   try {
-    const tsxBin = path.join(SERVER_ROOT, "node_modules/.bin/tsx");
-    const output = execSync(`"${tsxBin}" ${tmpFile}`, {
+    const tsxBin = require.resolve("tsx/cli");
+    const nodeBin = process.execPath;
+    const output = execSync(`"${nodeBin}" "${tsxBin}" "${tmpFile}"`, {
       cwd: SERVER_ROOT,
       env: {
         ...process.env,
@@ -98,21 +107,29 @@ process.stdout.write(JSON.stringify(schema));
       timeout: 15000,
     }).toString();
 
-    if (!output.trim()) return null;
-    return JSON.parse(output);
+    if (!output.trim()) {
+      return { success: false, error: "Empty output from extraction process" };
+    }
+    if (output.includes("SKIP:")) {
+      console.warn(
+        `[docs:db] ⚠️  Skipped ${path.basename(modelFile)}: ${output.replace("SKIP:", "").trim()}`,
+      );
+      return { success: true, skipped: true };
+    }
+    return { success: true, schema: JSON.parse(output) };
   } catch (err) {
     const stderr = err.stderr?.toString() || "";
     if (stderr.includes("SKIP:")) {
       console.warn(
         `[docs:db] ⚠️  Skipped ${path.basename(modelFile)}: ${stderr.replace("SKIP:", "").trim()}`,
       );
-      return null;
+      return { success: true, skipped: true };
     }
     console.error(
       `[docs:db] ❌ Failed to extract schema from ${path.basename(modelFile)}:`,
       stderr || err.message,
     );
-    return null;
+    return { success: false, error: stderr || err.message };
   } finally {
     // Clean up temp file
     try {
@@ -130,6 +147,14 @@ async function main() {
   // Ensure output directory exists
   fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
 
+  // Read existing file if any
+  let existing = null;
+  try {
+    if (fs.existsSync(OUTPUT_FILE)) {
+      existing = JSON.parse(fs.readFileSync(OUTPUT_FILE, "utf-8"));
+    }
+  } catch (_) {}
+
   if (modelFiles.length === 0) {
     console.warn(
       "[docs:db] ⚠️  No *.model.ts files found in src/modules/. " +
@@ -141,12 +166,31 @@ async function main() {
       description:
         "Auto-generated from Mongoose model definitions. " +
         "No model files found yet. Add *.model.ts files to src/modules/<feature>/.",
-      "x-generated-at": new Date().toISOString(),
       "x-generated-by": "mongoose-schema-jsonschema",
       schemas: {},
     };
-    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(emptyOutput, null, 2));
-    console.log(`[docs:db] ✅ Empty schemas.json written to ${OUTPUT_FILE}`);
+
+    const emptyOutputNormalized = { ...emptyOutput };
+    delete emptyOutputNormalized["x-generated-at"];
+
+    const existingNormalized = existing ? { ...existing } : null;
+    if (existingNormalized) {
+      delete existingNormalized["x-generated-at"];
+    }
+
+    if (
+      existing &&
+      JSON.stringify(emptyOutputNormalized) ===
+        JSON.stringify(existingNormalized)
+    ) {
+      console.log(
+        `[docs:db] 📄 No changes detected. Database schemas are up-to-date.`,
+      );
+    } else {
+      emptyOutput["x-generated-at"] = new Date().toISOString();
+      fs.writeFileSync(OUTPUT_FILE, JSON.stringify(emptyOutput, null, 2));
+      console.log(`[docs:db] ✅ Empty schemas.json written to ${OUTPUT_FILE}`);
+    }
     return;
   }
 
@@ -159,16 +203,28 @@ async function main() {
 
   const schemas = {};
   let successCount = 0;
+  let hasFailed = false;
 
   for (const modelFile of modelFiles) {
     const modelName = path.basename(modelFile, ".model.ts");
     console.log(`[docs:db] ⚙️  Extracting schema: ${modelName}`);
 
-    const schema = extractSchemaFromFile(modelFile);
-    if (schema) {
-      schemas[modelName] = schema;
-      successCount++;
+    const result = extractSchemaFromFile(modelFile);
+    if (result && result.success) {
+      if (!result.skipped) {
+        schemas[modelName] = result.schema;
+        successCount++;
+      }
+    } else {
+      hasFailed = true;
     }
+  }
+
+  if (hasFailed) {
+    console.error(
+      "[docs:db] ❌ Database schema generation failed. Output not updated.",
+    );
+    process.exit(1);
   }
 
   const output = {
@@ -177,15 +233,32 @@ async function main() {
     description:
       "Auto-generated from Mongoose model definitions. " +
       "Do not edit manually — regenerated on every commit and via `pnpm docs:watch`.",
-    "x-generated-at": new Date().toISOString(),
     "x-generated-by": "mongoose-schema-jsonschema",
     schemas,
   };
 
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(output, null, 2));
-  console.log(
-    `[docs:db] ✅ ${successCount}/${modelFiles.length} schema(s) written to:\n         ${OUTPUT_FILE}`,
-  );
+  const outputNormalized = { ...output };
+  delete outputNormalized["x-generated-at"];
+
+  const existingNormalized = existing ? { ...existing } : null;
+  if (existingNormalized) {
+    delete existingNormalized["x-generated-at"];
+  }
+
+  if (
+    existing &&
+    JSON.stringify(outputNormalized) === JSON.stringify(existingNormalized)
+  ) {
+    console.log(
+      `[docs:db] 📄 No changes detected. Database schemas are up-to-date.`,
+    );
+  } else {
+    output["x-generated-at"] = new Date().toISOString();
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(output, null, 2));
+    console.log(
+      `[docs:db] ✅ ${successCount}/${modelFiles.length} schema(s) written to:\n         ${OUTPUT_FILE}`,
+    );
+  }
 }
 
 main().catch((err) => {
