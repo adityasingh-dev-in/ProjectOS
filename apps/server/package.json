@@ -7,7 +7,11 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "docs:generate:api": "node scripts/generate-api-docs.mjs",
+    "docs:generate:db": "node scripts/generate-db-docs.mjs",
+    "docs:generate": "pnpm docs:generate:api && pnpm docs:generate:db",
+    "docs:watch": "chokidar \"src/modules/**/*.{route,controller,model}.ts\" -c \"pnpm docs:generate\" --initial"
   },
   "keywords": [],
   "author": "",
@@ -48,7 +52,9 @@
     "@types/uuid": "^11.0.0",
     "eslint": "^10.6.0",
     "globals": "^17.7.0",
+    "mongoose-schema-jsonschema": "^2.2.0",
     "nodemon": "^3.1.14",
+    "swagger-autogen": "^2.23.7",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.0",
     "typescript": "^5.9.3",

@@ -46,3 +46,7 @@ next-env.d.ts
 
 # Logs
 *.log
+
+# temporary
+docs
+assets

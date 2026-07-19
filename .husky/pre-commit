@@ -1,1 +1,10 @@
 pnpm exec lint-staged
+
+# ── Docs Safety Net ─────────────────────────────────────────────────────────
+# Regenerate API and database docs so they are never out of sync with the code.
+# The generated files are then staged so they are included in this commit.
+echo "📄 Regenerating API & DB docs..."
+pnpm --filter server docs:generate
+
+echo "📦 Staging generated docs..."
+git add docs/06-generated/

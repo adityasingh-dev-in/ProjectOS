@@ -17,6 +17,11 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "docs:generate": {
+      "cache": false,
+      "outputs": ["docs/06-generated/**"],
+      "description": "Regenerate OpenAPI and database schema docs from source files"
     }
   }
 }
